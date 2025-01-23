@@ -1,0 +1,91 @@
+@page "/signup"
+@using System.ComponentModel.DataAnnotations
+@using AuthServer.Core
+@using AuthServer.Core.Interface
+@using Microsoft.AspNetCore.Components.Forms
+@inject ILogger<Signup> _logger
+@using AuthServer.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject IPasswordHasher _passwordHasher
+@inject AuthDbContext _dbContext
+
+<div>
+    <form @onsubmit="HandleValidSubmit">
+        <fieldset>
+            <legend>Sign Up</legend>
+            <div>
+                <label for="Username">Username</label>
+                <input id="Username" @bind="Model!.Username" @bind:event="oninput" data-testid="username-input" />
+            </div>
+            <div>
+                <label for="Password">Password</label>
+                <input type="password" id="Password" @bind="Model!.Password" @bind:event="oninput" data-testid="password-input" />
+            </div>
+            <div>
+                <label for="ConfirmPassword">Confirm Password</label>
+                <input type="password" id="ConfirmPassword" @bind="Model!.ConfirmPassword" @bind:event="oninput" data-testid="confirm-password-input" />
+            </div>
+            <button type="submit" data-testid="signup-button">Sign Up</button>
+        </fieldset>
+    </form>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div>
+            @errorMessage
+        </div>
+    }
+</div>
+
+@code {
+    private SignupModel? Model { get; set; } = new();
+
+    private string errorMessage = string.Empty;
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            _logger.LogInformation("Attempting to register user: {Username}", Model!.Username);
+            if (await _dbContext.Users.AnyAsync(u => u.Username == Model!.Username))
+            {
+                errorMessage = "A user with this username already exists.";
+                return;
+            }
+
+            var passwordHash = _passwordHasher.HashPassword(Model!.Password, out var passwordSalt, out var passwordIterations);
+
+            var user = User.Create(
+                username: Model!.Username,
+                passwordHash: passwordHash,
+                passwordSalt: passwordSalt,
+                passwordIterations: passwordIterations
+            );
+
+            _logger.LogInformation("User created: {Username}", user.Username);
+
+            _dbContext.Users.Add(user);
+            await _dbContext.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred during registration for user: {Username}", Model!.Username);
+            errorMessage = "Error occurred during registration. Please try again.";
+        }
+    }
+
+    public class SignupModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Username { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(maximumLength: 100, MinimumLength = 8)]
+        public string Password { get; set; } = string.Empty;    
+
+        [Required]
+        [Compare(nameof(Password), ErrorMessage = "Passwords do not match")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}
