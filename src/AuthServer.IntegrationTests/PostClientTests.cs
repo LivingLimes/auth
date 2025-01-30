@@ -33,10 +33,11 @@ public class PostClientTests : IClassFixture<WebApplicationFactory<Program>>
             AllowedResponseTypes = ["code"],
             AccessTokenLifetimeInSeconds = 3600,
             RequirePkce = false,
+            Audience = ["https://localhost/callback", "other audience"],
             // Scopes = "scope1 scope2",
         };
 
-        var response = await client.PostAsJsonAsync("/register", request);
+        var response = await client.PostAsJsonAsync("/client", request);
 
         Console.WriteLine(response.Content.ReadAsStringAsync().Result);
         response.EnsureSuccessStatusCode();
@@ -50,5 +51,6 @@ public class PostClientTests : IClassFixture<WebApplicationFactory<Program>>
         responseData?.ResponseTypes.Should().BeEquivalentTo(request.AllowedResponseTypes);
         responseData?.RequirePkce.Should().Be(request.RequirePkce);
         responseData?.AccessTokenLifetimeInSeconds.Should().Be(request.AccessTokenLifetimeInSeconds);
+        responseData?.Audience.Should().BeEquivalentTo(request.Audience);
     }
 } 

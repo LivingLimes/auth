@@ -27,8 +27,11 @@ public sealed record PostClientRequest
     // public string[]? Contacts { get; init; }
 
     // Custom properties
-    [JsonPropertyName("token_lifetime_seconds")]
+    [JsonPropertyName("access_token_lifetime_seconds")]
     public int AccessTokenLifetimeInSeconds { get; init; }
+
+    [JsonPropertyName("audience")]
+    public string[] Audience { get; init; } = Array.Empty<string>();
 
     [JsonPropertyName("require_pkce")]
     public bool RequirePkce { get; init; }

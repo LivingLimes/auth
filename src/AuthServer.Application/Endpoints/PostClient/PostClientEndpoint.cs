@@ -41,7 +41,8 @@ public class PostClientEndpoint
             tokenEndpointAuthMethod: EnumMethods.ParseFromDescription<TokenEndpointAuthMethod>(request.TokenEndpointAuthMethod),
             allowedResponseTypes: allowedResponseTypes,
             requirePkce: request.RequirePkce,
-            accessTokenLifetimeInSeconds: request.AccessTokenLifetimeInSeconds
+            accessTokenLifetimeInSeconds: request.AccessTokenLifetimeInSeconds,
+            audiences: request.Audience.Select(aud => new Audience { Name = aud })
         );
 
         await dbContext.Clients.AddAsync(client);
@@ -61,10 +62,11 @@ public class PostClientEndpoint
             TokenEndpointAuthMethod = client.TokenEndpointAuthMethod.GetDescription(),
             ResponseTypes = client.AllowedResponseTypes.Value.Select(rt => rt.ResponseType.GetDescription()).ToArray(),
             RequirePkce = client.RequirePkce,
-            AccessTokenLifetimeInSeconds = client.AccessTokenLifetimeInSeconds
+            AccessTokenLifetimeInSeconds = client.AccessTokenLifetimeInSeconds,
+            Audience = client.Audiences.Select(aud => aud.Name).ToArray()
         };
 
-        return Results.Created($"/register", response);
+        return Results.Created($"/client", response);
     }
 
     private static IResult? ValidateRequest(PostClientRequest request)

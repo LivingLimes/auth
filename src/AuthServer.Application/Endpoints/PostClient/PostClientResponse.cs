@@ -42,4 +42,7 @@ public sealed record PostClientResponse
 
     [JsonPropertyName("require_pkce")]
     public required bool RequirePkce { get; init; }
+
+    [JsonPropertyName("audience")]
+    public required string[] Audience { get; init; }
 }

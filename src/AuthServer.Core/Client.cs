@@ -32,10 +32,13 @@ public class Client : BaseEntity
     public required bool RequirePkce { get; init; }
     public required int AccessTokenLifetimeInSeconds {get; init;}
 
+    private ICollection<Audience> _audiences = new List<Audience>();
+    public required ICollection<Audience> Audiences { get; init; }
+
     private Client() { }
 
     [SetsRequiredMembers]
-    private Client(string name, AllowedGrantTypes allowedGrantTypes, RedirectUris redirectUris, AllowedResponseTypes allowedResponseTypes, TokenEndpointAuthMethod tokenEndpointAuthMethod, bool requirePkce, int accessTokenLifetimeInSeconds)
+    private Client(string name, AllowedGrantTypes allowedGrantTypes, RedirectUris redirectUris, AllowedResponseTypes allowedResponseTypes, TokenEndpointAuthMethod tokenEndpointAuthMethod, bool requirePkce, int accessTokenLifetimeInSeconds, IEnumerable<Audience> audiences)
     {
         Name = name;
         
@@ -51,11 +54,14 @@ public class Client : BaseEntity
         TokenEndpointAuthMethod = tokenEndpointAuthMethod;
         RequirePkce = requirePkce;
         AccessTokenLifetimeInSeconds = accessTokenLifetimeInSeconds;
+
+        _audiences = audiences.ToList();
+        Audiences = _audiences;
     }
 
-    public static Client Create(string name, AllowedGrantTypes allowedGrantTypes, RedirectUris redirectUris, AllowedResponseTypes allowedResponseTypes, TokenEndpointAuthMethod tokenEndpointAuthMethod, bool requirePkce, int accessTokenLifetimeInSeconds)
+    public static Client Create(string name, AllowedGrantTypes allowedGrantTypes, RedirectUris redirectUris, AllowedResponseTypes allowedResponseTypes, TokenEndpointAuthMethod tokenEndpointAuthMethod, bool requirePkce, int accessTokenLifetimeInSeconds, IEnumerable<Audience> audiences)
     {
-        return new Client(name, allowedGrantTypes, redirectUris, allowedResponseTypes, tokenEndpointAuthMethod, requirePkce, accessTokenLifetimeInSeconds);
+        return new Client(name, allowedGrantTypes, redirectUris, allowedResponseTypes, tokenEndpointAuthMethod, requirePkce, accessTokenLifetimeInSeconds, audiences.ToList());
     }
 
 }
