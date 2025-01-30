@@ -4,6 +4,7 @@ using AuthServer.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using AuthServer.Application.Endpoints.PostClient;
+using AuthServer.Application.Endpoints.PostToken;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,4 +34,8 @@ app.UseStaticFiles();
 app.MapRazorComponents<AuthServer.Application.Components.App>()
     .AddInteractiveServerRenderMode();
 
+app.MapPost("/client", PostClientEndpoint.HandleAsync);
+
 app.Run();
+
+public partial class Program { }
