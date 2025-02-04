@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using AuthServer.Core;
 
 namespace AuthServer.Core;
 
@@ -35,10 +36,13 @@ public class Client : BaseEntity
     private ICollection<Audience> _audiences = new List<Audience>();
     public required ICollection<Audience> Audiences { get; init; }
 
+    private ICollection<Scope> _scopes;
+    public required ICollection<Scope> Scopes { get; init; }
+
     private Client() { }
 
     [SetsRequiredMembers]
-    private Client(string name, AllowedGrantTypes allowedGrantTypes, RedirectUris redirectUris, AllowedResponseTypes allowedResponseTypes, TokenEndpointAuthMethod tokenEndpointAuthMethod, bool requirePkce, int accessTokenLifetimeInSeconds, IEnumerable<Audience> audiences)
+    private Client(string name, AllowedGrantTypes allowedGrantTypes, RedirectUris redirectUris, AllowedResponseTypes allowedResponseTypes, TokenEndpointAuthMethod tokenEndpointAuthMethod, bool requirePkce, int accessTokenLifetimeInSeconds, IEnumerable<Audience> audiences, IEnumerable<Scope> scopes)
     {
         Name = name;
         
@@ -57,11 +61,14 @@ public class Client : BaseEntity
 
         _audiences = audiences.ToList();
         Audiences = _audiences;
+
+        _scopes = scopes.ToList();
+        Scopes = _scopes;
     }
 
-    public static Client Create(string name, AllowedGrantTypes allowedGrantTypes, RedirectUris redirectUris, AllowedResponseTypes allowedResponseTypes, TokenEndpointAuthMethod tokenEndpointAuthMethod, bool requirePkce, int accessTokenLifetimeInSeconds, IEnumerable<Audience> audiences)
+    public static Client Create(string name, AllowedGrantTypes allowedGrantTypes, RedirectUris redirectUris, AllowedResponseTypes allowedResponseTypes, TokenEndpointAuthMethod tokenEndpointAuthMethod, bool requirePkce, int accessTokenLifetimeInSeconds, IEnumerable<Audience> audiences, IEnumerable<Scope> scopes)
     {
-        return new Client(name, allowedGrantTypes, redirectUris, allowedResponseTypes, tokenEndpointAuthMethod, requirePkce, accessTokenLifetimeInSeconds, audiences.ToList());
+        return new Client(name, allowedGrantTypes, redirectUris, allowedResponseTypes, tokenEndpointAuthMethod, requirePkce, accessTokenLifetimeInSeconds, audiences, scopes);
     }
 
 }

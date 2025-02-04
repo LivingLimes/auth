@@ -42,7 +42,8 @@ public class PostClientEndpoint
             allowedResponseTypes: allowedResponseTypes,
             requirePkce: request.RequirePkce,
             accessTokenLifetimeInSeconds: request.AccessTokenLifetimeInSeconds,
-            audiences: request.Audience.Select(aud => new Audience { Name = aud })
+            audiences: request.Audience.Select(aud => new Audience { Name = aud }),
+            scopes: request.Scopes.Split(' ').Select(s => new Scope { Name = s })
         );
 
         await dbContext.Clients.AddAsync(client);
@@ -63,7 +64,8 @@ public class PostClientEndpoint
             ResponseTypes = client.AllowedResponseTypes.Value.Select(rt => rt.ResponseType.GetDescription()).ToArray(),
             RequirePkce = client.RequirePkce,
             AccessTokenLifetimeInSeconds = client.AccessTokenLifetimeInSeconds,
-            Audience = client.Audiences.Select(aud => aud.Name).ToArray()
+            Audience = client.Audiences.Select(aud => aud.Name).ToArray(),
+            Scopes = client.Scopes.Select(s => s.Name).ToArray()
         };
 
         return Results.Created($"/client", response);

@@ -9,4 +9,5 @@ public static class JwtClaims
     public const string NotBefore = "nbf";
     public const string IssuedAt = "iat";
     public const string JwtId = "jti";
+    public const string Scope = "scope";
 }

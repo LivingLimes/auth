@@ -45,4 +45,7 @@ public sealed record PostClientResponse
 
     [JsonPropertyName("audience")]
     public required string[] Audience { get; init; }
+
+    [JsonPropertyName("scopes")]
+    public required string[] Scopes { get; init; }
 }

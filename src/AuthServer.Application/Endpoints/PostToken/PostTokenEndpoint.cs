@@ -221,7 +221,8 @@ public class PostTokenEndpoint
             { JwtClaims.Expiration, now.AddSeconds(client.AccessTokenLifetimeInSeconds).ToString() },
             { JwtClaims.IssuedAt, now.ToString() },
             { JwtClaims.JwtId, Guid.NewGuid().ToString() },
-            { JwtClaims.NotBefore, now.ToString() }
+            { JwtClaims.NotBefore, now.ToString() },
+            { JwtClaims.Scope, authCode.Scopes }
         };
         var accessToken = tokenGenerator.Generate(algo: jwtOptions.Value.AccessTokenSigningAlgorithm, payload: accessTokenPayload);
 

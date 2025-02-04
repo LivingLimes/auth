@@ -34,7 +34,7 @@ public class PostClientTests : IClassFixture<WebApplicationFactory<Program>>
             AccessTokenLifetimeInSeconds = 3600,
             RequirePkce = false,
             Audience = ["https://localhost/callback", "other audience"],
-            // Scopes = "scope1 scope2",
+            Scopes = "scope1 scope2",
         };
 
         var response = await client.PostAsJsonAsync("/client", request);
@@ -52,5 +52,6 @@ public class PostClientTests : IClassFixture<WebApplicationFactory<Program>>
         responseData?.RequirePkce.Should().Be(request.RequirePkce);
         responseData?.AccessTokenLifetimeInSeconds.Should().Be(request.AccessTokenLifetimeInSeconds);
         responseData?.Audience.Should().BeEquivalentTo(request.Audience);
+        responseData?.Scopes.Should().BeEquivalentTo(request.Scopes.Split(' '));
     }
 } 
