@@ -18,4 +18,7 @@ public sealed record PostTokenRequest
 
     [JsonPropertyName("user_id")]
     public string UserId {get; init; } = string.Empty;
+
+    [JsonPropertyName("code_verifier")]
+    public string CodeVerifier { get; init; } = string.Empty;
 }

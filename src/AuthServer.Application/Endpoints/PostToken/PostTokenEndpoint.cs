@@ -2,22 +2,89 @@ namespace AuthServer.Application.Endpoints.PostToken;
 
 using System.Text.Json;
 using AuthServer.Application.Constants;
+using AuthServer.Application.Options.Jwt;
 using AuthServer.Core;
 using AuthServer.Core.Interface;
+using AuthServer.Infrastructure.Data;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 public class PostTokenEndpoint
 {
     public static async Task<IResult> HandleAsync(
         PostTokenRequest request,
         IMemoryCache memoryCache,
-        IAccessTokenGenerator accessTokenGenerator,
+        AuthDbContext dbContext,
+        IJwtGenerator tokenGenerator,
         HttpContext httpContext,
+        IOptions<JwtOptions> jwtOptions,
         ILogger<PostTokenEndpoint> logger)
     {
         // Duplicate properties in the request don't need to be handled for a json payload because json cannot have duplicate properties.
 
         logger.LogInformation("Handling token request for client {ClientId}", request.ClientId);
+
+        if (request.GrantType == "refresh_token")
+        {
+            // Refresh token must exist
+            if (string.IsNullOrWhiteSpace(request.RefreshToken))
+            {
+                return Results.BadRequest(new PostTokenError
+                {
+                    Error = PostTokenErrorCode.InvalidRequest.GetDescription(),
+                    ErrorDescription = "Refresh token is required"
+                });
+            }
+
+            // Rotate the refresh token
+            var refreshTokenKey = $"{CacheKeys.RefreshTokenCodePrefix}{request.RefreshToken}";
+            var rt = memoryCache.Get(refreshTokenKey);
+
+            if (rt == null)
+            {
+                return Results.BadRequest(new PostTokenError
+                {
+                    Error = PostTokenErrorCode.InvalidRequest.GetDescription(),
+                    ErrorDescription = "Invalid refresh token"
+                });
+            }
+
+            // if () Try validating signature
+
+            
+
+            memoryCache.Remove(refreshTokenKey);
+
+            // var now = DateTime.UtcNow;
+            // var newAccessTokenPayload = new Dictionary<string, object>
+            // { 
+            //     { JwtClaims.Subject, request.UserId },
+            //     { JwtClaims.Issuer, jwtOptions.Value.Issuer },
+            //     // { JwtClaims.Audience, new string[] { } },
+            //     { JwtClaims.Expiration, now.AddSeconds(client.AccessTokenLifetimeInSeconds).ToString() },
+            //     { JwtClaims.IssuedAt, now.ToString() },
+            //     { JwtClaims.JwtId, Guid.NewGuid().ToString() },
+            //     { JwtClaims.NotBefore, now.ToString() }
+            // };
+            // var newAccessToken = tokenGenerator.GenerateJwt(algo: jwtOptions.Value.AccessTokenSigningAlgorithm, payload: new Dictionary<string, string> { { "sub", "123" } });
+            // var newRefreshToken = tokenGenerator.GenerateJwt(algo: jwtOptions.Value.RefreshTokenSigningAlgorithm, new Dictionary<string, string> { { "", ""} });
+
+            // var newRefreshTokenObject = new RefreshToken
+            // {
+            //     // TODO: Client id
+            //     Token = newRefreshToken  
+            // };
+
+            // memoryCache.Set(key: refreshTokenKey, value: newRefreshTokenObject, absoluteExpirationRelativeToNow: TimeSpan.FromDays(1));
+
+            // return Results.Ok(new PostTokenResponse
+            // {
+            //     AccessToken = newAccessToken,
+            //     TokenType = TokenTypes.Bearer,
+            //     ExpiresIn = 600,
+            //     RefreshToken = newRefreshToken
+            // });
+        }
 
         if (request.GrantType != "authorization_code")
         {
@@ -108,6 +175,40 @@ public class PostTokenEndpoint
                 Error = PostTokenErrorCode.InvalidRequest.GetDescription(),
                 ErrorDescription = "Client not found"
             });
+        }
+
+        if (client.RequirePkce)
+        {
+            if (string.IsNullOrWhiteSpace(request.CodeVerifier))
+            {
+                return Results.BadRequest(new PostTokenError
+                {
+                    Error = PostTokenErrorCode.InvalidRequest.GetDescription(),
+                    ErrorDescription = "Code verifier is required"
+                });
+            }
+
+            var storedCodeChallenge = authCode.CodeChallenge;
+
+            // TODO: In the future, the ValidatePkce method should accept the challenge method and return a bool / error.
+            if (authCode.CodeChallengeMethod != "S256")
+            {
+                return Results.BadRequest(new PostTokenError
+                {
+                    Error = PostTokenErrorCode.InvalidRequest.GetDescription(),
+                    ErrorDescription = "Code challenge method only supports S256"
+                });
+            }
+
+            if (!PkceVerifier.ValidatePkce(request.CodeVerifier, storedCodeChallenge))
+            {
+                // TODO: Check if this error description is correct. I just made it vague for now.
+                return Results.BadRequest(new PostTokenError
+                {
+                    Error = PostTokenErrorCode.InvalidGrant.GetDescription(),
+                    ErrorDescription = "The provided authorisation grant (e.g., authorisation code, resource owner credentials) or refresh token is invalid, expired, revoked, does not match the redirection URI used in the authorisation request, or was issued to another client."
+                });
+            }
         }
 
         var now = DateTime.UtcNow;
