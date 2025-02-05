@@ -1,0 +1,235 @@
+@page "/login"
+@using AuthServer.Application.Constants
+@using AuthServer.Core
+@using AuthServer.Core.Interface
+@using AuthServer.Infrastructure.Data
+@using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.Extensions.Caching.Memory
+
+@inject IPasswordHasher _passwordHasher
+@inject NavigationManager _navigationManager
+@inject AuthDbContext _dbContext
+@inject IMemoryCache _memoryCache
+
+<section>
+    <form @onsubmit="HandleLogin">
+        <fieldset>
+            <legend>Login</legend>
+
+            <div>
+                <label for="username">Username:</label>
+                <input type="text" id="username" name="username" required @bind="loginModel.Username" />
+            </div>
+            <div>
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required @bind="loginModel.Password" />
+            </div>
+        </fieldset>
+
+        <button type="submit">Login</button>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <p class="error">@errorMessage</p>
+        }
+    </form>
+</section>
+
+@code {
+    private LoginModel loginModel = new LoginModel();
+    
+    [SupplyParameterFromQuery(Name = "response_type")]
+    public string[] ResponseType { get; set; } = new string[0];
+
+    [SupplyParameterFromQuery(Name = "client_id")]
+    public string[] ClientId { get; set; } = new string[0];
+
+    [SupplyParameterFromQuery(Name = "redirect_uri")]
+    public string[] RedirectUri { get; set; } = new string[0];
+
+    [SupplyParameterFromQuery(Name = "scope")]
+    public string[] Scope { get; set; } = new string[0];
+
+    [SupplyParameterFromQuery(Name = "state")]
+    public string[] State { get; set; } = new string[0];
+
+    [SupplyParameterFromQuery(Name = "code_challenge")]
+    public string[] CodeChallenge { get; set; } = new string[0];
+
+    [SupplyParameterFromQuery(Name = "code_challenge_method")]
+    public string[] CodeChallengeMethod { get; set; } = new string[0];
+
+    private string errorMessage = string.Empty;
+
+
+    private static readonly List<string> requiredQueryParams = new List<string>()
+        {
+            "response_type",
+            "client_id",
+            "redirect_uri"
+        };
+    
+    private static readonly List<string> optionalQueryParams = new List<string>()
+        {
+            "scope",
+            "state"
+        };
+
+    private static readonly List<string> allowedQueryParams = requiredQueryParams.Concat(optionalQueryParams).ToList();
+
+    private async Task HandleLogin()
+    {
+        // TODO: Handle access_denied, invalid_scope, server_error, temporarily_unavailable
+
+        @* If the request fails due to a missing, invalid, or mismatching
+        redirection URI, or if the client identifier is missing or invalid,
+        the authorization server SHOULD inform the resource owner of the
+        error and MUST NOT automatically redirect the user-agent to the
+        invalid redirection URI. *@
+        if (RedirectUri.Length != 1) {
+            errorMessage = $"The request is missing the 'redirect_uri' query parameter or specifies it more than once.";
+            return;
+        }
+
+        var redirectUri = RedirectUri.First();
+        if (!AuthServer.Core.RedirectUri.CanCreate(redirectUri))
+        {
+            errorMessage = $"The request includes an invalid 'redirect_uri' query parameter.";
+            return;
+        }
+
+        if (ClientId.Length != 1) {
+            errorMessage = $"The request is missing the 'client_id' query parameter or specifies it more than once.";
+            return;
+        }
+
+        var mismatchingRedirectUriAndClientError = "The request includes mismatching redirect uri and client id.";
+        var clientId = ClientId.First();
+        var client = _dbContext.Clients.FirstOrDefault(c => c.Id.ToString() == clientId);
+        if (client == null) {
+            errorMessage = mismatchingRedirectUriAndClientError;
+            return;
+        }
+
+        if (!client.RedirectUris.Value.Any(ru => ru.Value == redirectUri)) {
+            errorMessage = mismatchingRedirectUriAndClientError;
+            return;
+        }
+
+        if (Scope.Length != 1)
+        {
+            var url = QueryHelpers.AddQueryString(redirectUri, GetErrorDictionary("invalid_request", "The request is missing the 'scope' query parameter or specifies it more than once."));
+            _navigationManager.NavigateTo(url);
+        }
+
+        var requestScopesString = Scope.First();
+        var requestScopes = requestScopesString.Split(' ').ToList();
+        if (client.Scopes.Any(s => !requestScopes.Contains(s.Name)))
+        {
+            var url = QueryHelpers.AddQueryString(redirectUri, GetErrorDictionary("invalid_request", "The request includes a scope that is not supported by the client."));
+            _navigationManager.NavigateTo(url);
+        }
+
+        if (ResponseType.Length != 1)
+        {
+            var url = QueryHelpers.AddQueryString(redirectUri, GetErrorDictionary("invalid_request", "The request is missing the 'response_type' query parameter or specifies it more than once."));
+            _navigationManager.NavigateTo(url);
+        }
+
+        var responseType = ResponseType.First();
+        if (responseType != "code")
+        {
+            var url = QueryHelpers.AddQueryString(redirectUri, GetErrorDictionary("unsupported_response_type", "The request includes an unsupported response type."));
+            _navigationManager.NavigateTo(url);
+        }
+        
+        if (!client.AllowedResponseTypes.Value.Any(rt => rt.ResponseType.GetDescription() == responseType))
+        {
+            var url = QueryHelpers.AddQueryString(redirectUri, GetErrorDictionary("unauthorized_client", "The request includes a response type that is not supported by the client."));
+            _navigationManager.NavigateTo(url);
+        }
+
+        if (State.Length > 1)
+        {
+            var url = QueryHelpers.AddQueryString(redirectUri, GetErrorDictionary("invalid_request", "The request includes the 'state' query parameter more than once."));
+            _navigationManager.NavigateTo(url);
+        }
+        
+        var user = _dbContext.Users.FirstOrDefault(u => u.Username == loginModel.Username);
+        if (user == null)
+        {
+            errorMessage = "Invalid username or password";
+            return;
+        }
+
+        var isValidPassword = _passwordHasher.VerifyHashedPassword(loginModel.Password, user.PasswordHash, user.PasswordSalt, user.PasswordIterations);
+        if (!isValidPassword)
+        {
+            errorMessage = "Invalid username or password";
+            return;
+        }
+
+        if (CodeChallenge.Length != 1)
+        {
+            var url = QueryHelpers.AddQueryString(redirectUri, GetErrorDictionary("invalid_request", "The request is missing the 'code_challenge' query parameter or specifies it more than once."));
+            _navigationManager.NavigateTo(url);
+        }
+
+        var codeChallenge = CodeChallenge.First();
+        if (codeChallenge.Length < 43 || codeChallenge.Length > 128)
+        {
+            var url = QueryHelpers.AddQueryString(redirectUri, GetErrorDictionary("invalid_request", "The 'code_challenge' query parameter must be between 43 and 128 characters long."));
+            _navigationManager.NavigateTo(url);
+        }
+
+        if (CodeChallengeMethod.Length != 1)
+        {
+            var url = QueryHelpers.AddQueryString(redirectUri, GetErrorDictionary("invalid_request", "The request is missing the 'code_challenge_method' query parameter or specifies it more than once."));
+            _navigationManager.NavigateTo(url);
+        }
+
+        var codeChallengeMethod = CodeChallengeMethod.First();
+        if (codeChallengeMethod != "S256")
+        {
+            var url = QueryHelpers.AddQueryString(redirectUri, GetErrorDictionary("invalid_request", "The 'code_challenge_method' query parameter must be 'S256'."));
+            _navigationManager.NavigateTo(url);
+        }
+
+        var authorizationCode = Guid.NewGuid().ToString();
+        var authCodeEntry = new AuthorisationCode
+        {
+            Code = authorizationCode,
+            ClientId = client.Id,
+            RedirectUri = redirectUri,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+            CodeChallenge = codeChallenge,
+            CodeChallengeMethod = codeChallengeMethod,
+            Scopes = requestScopesString
+        };
+        
+        var cacheKey = $"{CacheKeys.AuthorisationCodePrefix}{authorizationCode}";
+        _memoryCache.Set(key: cacheKey, value: authCodeEntry, absoluteExpirationRelativeToNow: TimeSpan.FromMinutes(10));
+
+        var redirectUrl = QueryHelpers.AddQueryString(redirectUri, new Dictionary<string, string?>
+        {
+            { "code", authorizationCode },
+            { "state", State.FirstOrDefault() }
+        });
+        _navigationManager.NavigateTo(redirectUrl);
+    }
+
+    private Dictionary<string, string?> GetErrorDictionary(string error, string errorDescription)
+    {
+        return new Dictionary<string, string?>()
+        {
+            { "error", error },
+            { "error_description", errorDescription }
+        };
+    }
+
+    public class LoginModel
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+}
