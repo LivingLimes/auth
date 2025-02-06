@@ -188,19 +188,7 @@ public class PostTokenEndpoint
                 });
             }
 
-            var storedCodeChallenge = authCode.CodeChallenge;
-
-            // TODO: In the future, the ValidatePkce method should accept the challenge method and return a bool / error.
-            if (authCode.CodeChallengeMethod != "S256")
-            {
-                return Results.BadRequest(new PostTokenError
-                {
-                    Error = PostTokenErrorCode.InvalidRequest.GetDescription(),
-                    ErrorDescription = "Code challenge method only supports S256"
-                });
-            }
-
-            if (!PkceVerifier.ValidatePkce(request.CodeVerifier, storedCodeChallenge))
+            if (!PkceVerifier.ValidatePkce(request.CodeVerifier, authCode.CodeChallenge))
             {
                 // TODO: Check if this error description is correct. I just made it vague for now.
                 return Results.BadRequest(new PostTokenError
